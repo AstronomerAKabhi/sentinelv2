@@ -5,8 +5,21 @@ import os
 import json
 import sys
 
-VT_API_KEY = os.environ.get("VT_API_KEY", "5544106b4abff975881f81a0ef8c9d547f8fc213b57c73561c9af1679583f3eb")
-HF_TOKEN = os.environ.get("HF_TOKEN", "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")
+def load_config():
+    try:
+        # Try to find config.json in project root
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        config_path = os.path.join(base_dir, "config.json")
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                return json.load(f)
+        return {}
+    except:
+        return {}
+
+config = load_config()
+VT_API_KEY = config.get("vt_api_key", os.environ.get("VT_API_KEY", ""))
+HF_TOKEN = config.get("hf_token", os.environ.get("HF_TOKEN", ""))
 LIMA_INSTANCE = "default"
 REMOTE_BINARY_PATH = "/tmp/cargo_cache/release/sentinel_cli"
 SSH_CONFIG_PATH = os.path.expanduser("~/.lima/default/ssh.config")

@@ -9,6 +9,21 @@ import requests
 LIMA_INSTANCE = "local"
 REMOTE_BINARY_PATH = os.path.expanduser("~/sentinel_v2/linux-backend/target/release/sentinel_cli")
 
+def load_config():
+    try:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        config_path = os.path.join(base_dir, "config.json")
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                return json.load(f)
+        return {}
+    except:
+        return {}
+
+config = load_config()
+HF_TOKEN = config.get("hf_token", "")
+VT_API_KEY = config.get("vt_api_key", "")
+
 def read_message():
     raw_length = sys.stdin.buffer.read(4)
     if not raw_length:
@@ -28,8 +43,8 @@ def run_remote_scan(payload):
     cmd = [REMOTE_BINARY_PATH]
     
     env = os.environ.copy()
-    env["VT_API_KEY"] = "5544106b4abff975881f81a0ef8c9d547f8fc213b57c73561c9af1679583f3eb"
-    env["HF_TOKEN"] = "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"
+    env["VT_API_KEY"] = VT_API_KEY
+    env["HF_TOKEN"] = HF_TOKEN
     
 def handle_message(message):
     target = message.get("target", "")
@@ -47,7 +62,7 @@ def handle_message(message):
 def scan_url(url):
     import requests
     
-    HF_TOKEN = "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"
+    # HF_TOKEN is loaded globally
     
     safe_domains = [
         'google.com', 'youtube.com', 'facebook.com', 'twitter.com', 'instagram.com',
