@@ -1,5 +1,3 @@
-// dashboard.js - Displays scan history and statistics
-
 async function loadDashboard() {
     const result = await chrome.storage.local.get(['scanHistory', 'stats']);
     const history = result.scanHistory || [];
@@ -9,17 +7,14 @@ async function loadDashboard() {
         last_updated: Date.now()
     };
 
-    // Update stats
     document.getElementById('totalScans').textContent = stats.total_scans;
     document.getElementById('threatsBlocked').textContent = stats.threats_blocked;
 
-    // Calculate safety score
     const safetyScore = stats.total_scans > 0
         ? Math.round((1 - stats.threats_blocked / stats.total_scans) * 100)
         : 100;
     document.getElementById('safetyScore').textContent = safetyScore + '%';
 
-    // Load history
     const historyBody = document.getElementById('historyBody');
     const emptyState = document.getElementById('emptyState');
 
@@ -36,7 +31,6 @@ async function loadDashboard() {
         const date = new Date(entry.timestamp * 1000);
         const timeStr = date.toLocaleTimeString() + ' ' + date.toLocaleDateString();
 
-        // Truncate URL
         const url = entry.url.length > 50
             ? entry.url.substring(0, 50) + '...'
             : entry.url;
@@ -53,7 +47,6 @@ async function loadDashboard() {
     });
 }
 
-// Export to CSV
 document.getElementById('exportBtn').addEventListener('click', async () => {
     const result = await chrome.storage.local.get(['scanHistory']);
     const history = result.scanHistory || [];
@@ -63,7 +56,6 @@ document.getElementById('exportBtn').addEventListener('click', async () => {
         return;
     }
 
-    // Create CSV
     let csv = 'Timestamp,URL,Threat Level,Score,Action,Indicators\n';
 
     history.forEach(entry => {
@@ -72,7 +64,6 @@ document.getElementById('exportBtn').addEventListener('click', async () => {
         csv += `"${date.toISOString()}","${entry.url}","${entry.threat_level}",${entry.score},"${entry.action}","${indicators}"\n`;
     });
 
-    // Download
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -81,7 +72,6 @@ document.getElementById('exportBtn').addEventListener('click', async () => {
     a.click();
 });
 
-// Export to JSON
 const exportJsonBtn = document.createElement('button');
 exportJsonBtn.textContent = 'Export Report (JSON)';
 exportJsonBtn.className = 'btn-export';
@@ -94,7 +84,6 @@ exportJsonBtn.addEventListener('click', async () => {
         return;
     }
 
-    // Create comprehensive JSON export
     const exportData = {
         exported_at: new Date().toISOString(),
         stats: result.stats || {},
@@ -111,5 +100,4 @@ exportJsonBtn.addEventListener('click', async () => {
 });
 document.getElementById('exportBtn').parentElement.appendChild(exportJsonBtn);
 
-// Initialize
 document.addEventListener('DOMContentLoaded', loadDashboard);

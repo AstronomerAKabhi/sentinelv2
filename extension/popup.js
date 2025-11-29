@@ -6,10 +6,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const verdictDisplay = document.getElementById('verdict');
   const statusDot = document.getElementById('status');
 
-  // Check connection status (mock for now, or could ping background)
   statusDot.classList.add('active');
 
-  // Add dashboard button
   const dashboardBtn = document.createElement('button');
   dashboardBtn.textContent = 'View Dashboard';
   dashboardBtn.style.cssText = 'width: 100%; margin-top: 10px; background: #424242; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer;';
@@ -18,7 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('root').appendChild(dashboardBtn);
 
-  // URL Scan Handler
   scanBtn.addEventListener('click', () => {
     const target = scanInput.value.trim();
     if (!target) return;
@@ -40,7 +37,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // File Scan Handler
   scanFileBtn.addEventListener('click', () => {
     const filePath = fileInput.value.trim();
     if (!filePath) return;
@@ -66,17 +62,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (message.type === "SCAN_RESULT") {
       const data = message.data;
 
-      // Check if threat score exists
       if (data.threat_score) {
         const level = data.threat_score.level;
         const score = data.threat_score.score;
 
-        // Determine color based on level
-        let levelColor = '#00e676'; // Green
-        if (level === 'MEDIUM') levelColor = '#ffc107'; // Yellow
-        if (level === 'HIGH') levelColor = '#f44336'; // Red
+        let levelColor = '#00e676';
+        if (level === 'MEDIUM') levelColor = '#ffc107';
+        if (level === 'HIGH') levelColor = '#f44336';
 
-        // Format display with better styling
         verdictDisplay.innerHTML = `
           <div style="padding: 15px; background: #1e1e1e; border-radius: 8px; margin-top: 10px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -112,7 +105,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         verdictDisplay.style.color = "#e0e0e0";
 
-        // Save to scan history for dashboard
         saveScanToHistory({
           timestamp: data.timestamp || Date.now() / 1000,
           url: scanInput.value,
@@ -124,7 +116,6 @@ document.addEventListener('DOMContentLoaded', () => {
           status: data.status
         });
 
-        // If HIGH threat, show warning modal
         if (level === 'HIGH' || score >= 70) {
           chrome.storage.local.set({
             currentThreat: {
@@ -141,7 +132,6 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         }
       } else {
-        // Fallback for old format or errors
         if (data.status === 'error') {
           verdictDisplay.innerHTML = `<div style="color: #f44336; padding: 10px;">❌ Error: ${data.details}</div>`;
         } else {
@@ -151,7 +141,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Helper function to save scan history
   async function saveScanToHistory(entry) {
     const result = await chrome.storage.local.get(['scanHistory', 'stats']);
     const history = result.scanHistory || [];

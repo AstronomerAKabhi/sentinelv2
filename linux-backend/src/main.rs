@@ -14,9 +14,9 @@ struct Cli {
 
 #[derive(Serialize)]
 struct ThreatScore {
-    level: String,           // "LOW", "MEDIUM", "HIGH"
-    score: u8,              // 0-100
-    confidence: f32,        // 0.0-1.0
+    level: String,
+    score: u8,
+    confidence: f32,
     indicators: Vec<String>,
 }
 
@@ -40,9 +40,8 @@ fn main() {
 fn calculate_threat_score(file_path: &str, analysis_details: &str) -> ThreatScore {
     let mut score: u8 = 0;
     let mut indicators: Vec<String> = Vec::new();
-    let mut confidence = 0.7; // Base confidence
+    let mut confidence = 0.7;
 
-    // Check 1: File extension analysis
     if file_path.ends_with(".exe") || file_path.ends_with(".dll") || file_path.ends_with(".scr") {
         score += 20;
         indicators.push("Executable file type".to_string());
@@ -52,25 +51,21 @@ fn calculate_threat_score(file_path: &str, analysis_details: &str) -> ThreatScor
         indicators.push("Script file - higher risk".to_string());
     }
     
-    // Check 2: Double extension (e.g., .pdf.exe)
     if file_path.matches('.').count() > 1 {
         score += 30;
         indicators.push("Suspicious double extension".to_string());
         confidence += 0.1;
     }
     
-    // Check 3: Analysis details (look for suspicious patterns)
     if analysis_details.contains("error") || analysis_details.contains("failed") {
         score += 15;
         indicators.push("Analysis encountered issues".to_string());
     }
     
     if analysis_details.contains("executed") {
-        // Successfully executed in VM - assume lower risk if no crashes
         indicators.push("Successfully analyzed in isolated environment".to_string());
     }
 
-    // Check 4: File size (if available from path)
     if let Ok(metadata) = std::fs::metadata(file_path) {
         let size = metadata.len();
         if size < 1024 {
@@ -83,10 +78,8 @@ fn calculate_threat_score(file_path: &str, analysis_details: &str) -> ThreatScor
         }
     }
 
-    // Normalize score to 0-100
     score = score.min(100);
 
-    // Determine threat level
     let level = if score < 30 {
         "LOW"
     } else if score < 70 {
@@ -95,7 +88,6 @@ fn calculate_threat_score(file_path: &str, analysis_details: &str) -> ThreatScor
         "HIGH"
     };
 
-    // Adjust confidence based on number of indicators
     confidence = (confidence + (indicators.len() as f32 * 0.05)).min(1.0);
 
     ThreatScore {
@@ -107,7 +99,6 @@ fn calculate_threat_score(file_path: &str, analysis_details: &str) -> ThreatScor
 }
 
 fn scan_file_firecracker(path: &str) -> Verdict {
-    // Check if Firecracker is available
     let fc_check = Command::new("which")
         .arg("firecracker")
         .output();
@@ -127,7 +118,6 @@ fn scan_file_firecracker(path: &str) -> Verdict {
         };
     }
 
-    // Use ~/sentinel_v2/firecracker-assets for kernel and rootfs
     let home = std::env::var("HOME").unwrap_or_else(|_| "/home/abhi".to_string());
     let kernel_path = format!("{}/sentinel_v2/firecracker-assets/vmlinux", home);
     let rootfs_path = format!("{}/sentinel_v2/firecracker-assets/rootfs.ext4", home);
@@ -162,7 +152,6 @@ fn scan_file_firecracker(path: &str) -> Verdict {
         };
     }
 
-    // Create VM configuration file
     let vm_id = format!("sentinel_{}", std::process::id());
     let socket_path = format!("/tmp/{}.sock", vm_id);
     let config_path = format!("/tmp/{}_config.json", vm_id);
@@ -190,7 +179,6 @@ fn scan_file_firecracker(path: &str) -> Verdict {
         kernel_path, rootfs_path
     );
 
-    // Write config to file
     if let Err(e) = fs::write(&config_path, vm_config) {
         return Verdict {
             status: "ERROR".to_string(),
@@ -206,17 +194,14 @@ fn scan_file_firecracker(path: &str) -> Verdict {
         };
     }
 
-    // Start Firecracker in background
     let fc_process = Command::new("firecracker")
         .args(&["--api-sock", &socket_path, "--config-file", &config_path])
         .spawn();
 
     match fc_process {
         Ok(mut child) => {
-            // Wait for VM to boot (timeout)
             std::thread::sleep(std::time::Duration::from_secs(3));
             
-            // Kill the VM
             let _ = child.kill();
             let output = child.wait_with_output();
 
@@ -234,11 +219,9 @@ fn scan_file_firecracker(path: &str) -> Verdict {
                 Err(e) => format!("MicroVM execution error: {}", e),
             };
 
-            // Cleanup
             let _ = fs::remove_file(&socket_path);
             let _ = fs::remove_file(&config_path);
 
-            // Calculate threat score based on analysis
             let threat_score = calculate_threat_score(path, &details);
             
             Verdict {
@@ -250,7 +233,6 @@ fn scan_file_firecracker(path: &str) -> Verdict {
             }
         },
         Err(e) => {
-            // Cleanup
             let _ = fs::remove_file(&config_path);
             
             Verdict {

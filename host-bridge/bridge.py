@@ -6,9 +6,7 @@ import subprocess
 import os
 import requests
 
-# Configuration
 LIMA_INSTANCE = "local"
-# Using the path specified in the user request
 REMOTE_BINARY_PATH = os.path.expanduser("~/sentinel_v2/linux-backend/target/release/sentinel_cli")
 
 def read_message():
@@ -27,45 +25,36 @@ def send_message(message):
     sys.stdout.buffer.flush()
 
 def run_remote_scan(payload):
-    # Run locally
     cmd = [REMOTE_BINARY_PATH]
     
-    # Environment variables
     env = os.environ.copy()
     env["VT_API_KEY"] = "5544106b4abff975881f81a0ef8c9d547f8fc213b57c73561c9af1679583f3eb"
     env["HF_TOKEN"] = "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"
     
 def handle_message(message):
-    """Handle incoming scan requests from Chrome extension"""
     target = message.get("target", "")
     action = message.get("action", "scan")
     
-    # Determine if it's a URL or file path
     is_url = target.startswith("http://") or target.startswith("https://")
     
     if is_url:
-        # Handle URL scan using Python CLI
         result = scan_url(target)
     else:
-        # Handle file scan using Rust backend
         result = scan_file(target)
     
     send_message(result)
 
 def scan_url(url):
-    """Scan URL using LLM and return structured JSON"""
     import requests
     
     HF_TOKEN = "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"
     
-    # Whitelist of known safe domains
     safe_domains = [
         'google.com', 'youtube.com', 'facebook.com', 'twitter.com', 'instagram.com',
         'linkedin.com', 'netflix.com', 'amazon.com', 'microsoft.com', 'apple.com',
         'github.com', 'stackoverflow.com', 'reddit.com', 'wikipedia.org'
     ]
     
-    # Check if domain is in whitelist
     domain = url.split('/')[2] if len(url.split('/')) > 2 else url
     is_whitelisted = any(safe in domain.lower() for safe in safe_domains)
     
@@ -99,39 +88,33 @@ def scan_url(url):
             data = response.json()
             llm_response = data['choices'][0]['message']['content']
             
-            # Parse LLM response for threat indicators
             is_malicious = "MALICIOUS" in llm_response.upper()
             
-            # Calculate threat score (more conservative)
             score = 0
             indicators = []
-            confidence = 0.6  # Start with lower confidence
+            confidence = 0.6
             
             if is_malicious:
-                score += 50  # Reduced from 70
+                score += 50
                 indicators.append("LLM flagged as potentially suspicious")
                 confidence = 0.75
             else:
                 indicators.append("LLM analysis: appears safe")
             
-            # Check for common phishing patterns (more specific)
             suspicious_patterns = ['verify', 'suspend', 'urgent', 'confirm', 'secure-account']
             if any(pattern in url.lower() for pattern in suspicious_patterns):
                 score += 30
                 indicators.append("URL contains high-risk keywords")
             
-            # Check domain (less weight)
             if url.startswith('http://'):
-                score += 15  # Reduced from 10
+                score += 15
                 indicators.append("No HTTPS encryption")
             
-            # Check for suspicious TLDs
             suspicious_tlds = ['.tk', '.ml', '.ga', '.cf', '.gq', '.xyz']
             if any(tld in url.lower() for tld in suspicious_tlds):
                 score += 25
                 indicators.append("Suspicious top-level domain")
             
-            # Determine threat level
             if score < 30:
                 level = "LOW"
             elif score < 70:
@@ -163,10 +146,8 @@ def scan_url(url):
         }
 
 def scan_file(file_path):
-    """Scan file using Rust backend"""
     import subprocess
     
-    # Run Rust backend
     binary_path = os.path.expanduser("~/sentinel_v2/linux-backend/target/release/sentinel_cli")
     cmd = [binary_path, "--path", file_path]
     
@@ -174,12 +155,10 @@ def scan_file(file_path):
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
         
         if result.returncode == 0:
-            # Extract JSON from output
             output = result.stdout
             json_start = output.rfind('{')
             
             if json_start != -1:
-                # Find matching closing brace
                 brace_count = 0
                 for i in range(json_start, len(output)):
                     if output[i] == '{':
