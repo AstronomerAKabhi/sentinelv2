@@ -20,6 +20,7 @@ def load_config():
 config = load_config()
 VT_API_KEY = config.get("vt_api_key", os.environ.get("VT_API_KEY", ""))
 HF_TOKEN = config.get("hf_token", os.environ.get("HF_TOKEN", ""))
+GEMINI_API_KEY = config.get("gemini_api_key", os.environ.get("GEMINI_API_KEY", ""))
 LIMA_INSTANCE = "default"
 REMOTE_BINARY_PATH = "/tmp/cargo_cache/release/sentinel_cli"
 SSH_CONFIG_PATH = os.path.expanduser("~/.lima/default/ssh.config")
@@ -240,16 +241,21 @@ def scan_file(path):
 @cli.command()
 @click.argument("url")
 def scan_vision(url):
-    """Tier 2: Visual Analysis via Computer Vision & OCR"""
+    """Tier 2: Visual Analysis via Google Gemini Pro Vision"""
     click.echo(f"\n👁️  Visual Scanning: {url}...\n")
     
-    # Add current directory to path to find vision_scanner
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
     
     try:
         import vision_scanner
+        from PIL import Image
+        import google.generativeai as genai
     except ImportError as e:
         click.echo(f"❌ Error: Dependencies missing ({e}). Run rebuild.sh")
+        return
+
+    if not GEMINI_API_KEY:
+        click.echo("❌ Error: GEMINI_API_KEY not found in config.json")
         return
 
     screenshot_path = "/tmp/screenshot.png"
@@ -260,70 +266,65 @@ def scan_vision(url):
         click.echo("❌ Failed to capture screenshot.")
         return
 
-    click.echo("📝 Extracting text (OCR)...")
-    text = vision_scanner.extract_text(saved_path)
-    
-    if not text:
-        click.echo("⚠️ No text extracted or OCR failed.")
-        text = "No text found."
-    else:
-        click.echo(f"Found {len(text)} characters of text.")
-
-    # LLM Analysis
-    click.echo("🧠 Analyzing visual context...")
-    
-    api_url = "https://router.huggingface.co/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    
-    prompt = f"""Analyze this website context for phishing.
-URL: {url}
-Visible Text on Page:
-{text[:1000]}... (truncated)
-
-Task:
-1. Identify any major brands mentioned in the text (e.g. Google, Microsoft, Bank).
-2. Check if the URL belongs to that brand.
-   - If text says "Google" and URL is "google.com" (or subdomains), it is SAFE.
-   - If text says "Google" and URL is "g0ogle.net", it is MALICIOUS.
-3. If no brand is detected, check for suspicious keywords (Login, Verify).
-
-Reply with MALICIOUS or SAFE and a brief reason."""
-
-    payload = {
-        "model": "meta-llama/Meta-Llama-3-8B-Instruct",
-        "messages": [{"role": "user", "content": prompt}],
-        "max_tokens": 200
-    }
+    click.echo("🧠 Analyzing visual context with Gemini Pro...")
     
     try:
-        response = requests.post(api_url, headers=headers, json=payload)
-        if response.status_code == 200:
-            data = response.json()
-            llm_response = data['choices'][0]['message']['content']
-            
-            is_malicious = "MALICIOUS" in llm_response.upper()
-            
-            if is_malicious:
-                level = "🔴 HIGH"
-                color = "\033[91m"
-                score = 85
-            else:
-                level = "🟢 LOW"
-                color = "\033[92m"
-                score = 10
-            
-            click.echo("=" * 60)
-            click.echo(f"  Threat Level: {color}{level}\033[0m")
-            click.echo(f"  Risk Score: {score}/100")
-            click.echo("=" * 60)
-            click.echo(f"\n💬 AI Visual Analysis:")
-            click.echo(f"  {llm_response}")
-            click.echo("\n" + "=" * 60)
-            
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel('models/gemini-pro-latest')
+        
+        img = Image.open(saved_path)
+        
+        prompt = f"""Analyze this website screenshot for phishing.
+URL: {url}
+
+Task:
+1. Identify the brand/logo in the image.
+2. Check if the URL matches that brand.
+   - If image shows Google/Gmail and URL is google.com -> SAFE.
+   - If image shows Google/Gmail and URL is not google.com -> MALICIOUS.
+   - If generic login page with no brand -> SUSPICIOUS.
+
+Reply with this JSON format:
+{{
+  "verdict": "MALICIOUS" or "SAFE" or "SUSPICIOUS",
+  "reason": "Brief explanation",
+  "brand_detected": "Brand Name" or null
+}}
+"""
+        response = model.generate_content([prompt, img])
+        
+        # Clean response text
+        text = response.text.replace('```json', '').replace('```', '').strip()
+        data = json.loads(text)
+        
+        verdict = data.get('verdict', 'UNKNOWN').upper()
+        reason = data.get('reason', 'No reason provided')
+        brand = data.get('brand_detected', 'None')
+        
+        if verdict == 'MALICIOUS':
+            level = "🔴 HIGH"
+            color = "\033[91m"
+            score = 90
+        elif verdict == 'SUSPICIOUS':
+            level = "🟡 MEDIUM"
+            color = "\033[93m"
+            score = 60
         else:
-            click.echo(f"❌ Error: {response.status_code} - {response.text}")
+            level = "🟢 LOW"
+            color = "\033[92m"
+            score = 10
+            
+        click.echo("=" * 60)
+        click.echo(f"  Threat Level: {color}{level}\033[0m")
+        click.echo(f"  Risk Score: {score}/100")
+        click.echo(f"  Brand Detected: {brand}")
+        click.echo("=" * 60)
+        click.echo(f"\n💬 Gemini Analysis:")
+        click.echo(f"  {reason}")
+        click.echo("\n" + "=" * 60)
+        
     except Exception as e:
-        click.echo(f"❌ Exception: {str(e)}")
+        click.echo(f"❌ Gemini Error: {str(e)}")
 
 if __name__ == "__main__":
     cli()

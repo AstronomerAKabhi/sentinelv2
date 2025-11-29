@@ -30,7 +30,7 @@ if ! command -v tesseract &> /dev/null; then
 fi
 
 echo "Installing Python dependencies..."
-pip3 install click requests playwright pytesseract Pillow --break-system-packages || echo "Warning: pip install failed"
+pip3 install click requests playwright pytesseract Pillow google-generativeai --break-system-packages || echo "Warning: pip install failed"
 
 # Install Playwright browsers
 echo "Installing Playwright browsers..."
