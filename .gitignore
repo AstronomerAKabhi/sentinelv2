@@ -1,0 +1,48 @@
+# Logs and temporary files
+logs/
+*.log
+scan_history.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+
+# Rust
+target/
+Cargo.lock
+**/*.rs.bk
+
+# Firecracker assets
+firecracker-assets/
+*.vmlinux
+*.ext4
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Sensitive data
+*.key
+*.pem
+config.json
+.env
+
+# Chrome extension
+extension/node_modules/
+
+# Temporary scan files
+temp_*
+*.tmp

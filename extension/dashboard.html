@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Sentinel V2 Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #121212;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .dashboard-header {
+            background: linear-gradient(135deg, #1e3a3a 0%, #2d5a5a 100%);
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 25px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .dashboard-title {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .dashboard-subtitle {
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #00897b;
+        }
+
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .section {
+            background: #1e1e1e;
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+        }
+
+        .threat-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .threat-table th {
+            text-align: left;
+            padding: 12px;
+            background: #252525;
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #888;
+        }
+
+        .threat-table td {
+            padding: 15px 12px;
+            border-bottom: 1px solid #2a2a2a;
+            font-size: 13px;
+        }
+
+        .threat-table tr:hover {
+            background: #252525;
+        }
+
+        .threat-level-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .threat-level-badge.high {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+
+        .threat-level-badge.medium {
+            background: rgba(255, 193, 7, 0.2);
+            color: #ffc107;
+        }
+
+        .threat-level-badge.low {
+            background: rgba(0, 230, 118, 0.2);
+            color: #00e676;
+        }
+
+        .action-badge {
+            padding: 4px 10px;
+            border-radius: 10px;
+            font-size: 11px;
+        }
+
+        .action-badge.blocked {
+            background: rgba(244, 67, 54, 0.15);
+            color: #f44336;
+        }
+
+        .action-badge.allowed {
+            background: rgba(0, 230, 118, 0.15);
+            color: #00e676;
+        }
+
+        .btn-export {
+            background: #00897b;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+
+        .btn-export:hover {
+            background: #00796b;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px;
+            color: #666;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="dashboard-header">
+        <div class="dashboard-title">🛡️ Sentinel V2 Dashboard</div>
+        <div class="dashboard-subtitle">Real-time threat monitoring and analysis</div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-label">Total Scans</div>
+            <div class="stat-value" id="totalScans">0</div>
+        </div>
+        <div class="stat-card" style="border-left-color: #f44336;">
+            <div class="stat-label">Threats Blocked</div>
+            <div class="stat-value" id="threatsBlocked">0</div>
+        </div>
+        <div class="stat-card" style="border-left-color: #ffc107;">
+            <div class="stat-label">Safety Score</div>
+            <div class="stat-value" id="safetyScore">100%</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">📊 Recent Scans</div>
+        <div id="historyContainer">
+            <table class="threat-table" id="threatTable">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Target</th>
+                        <th>Threat Level</th>
+                        <th>Score</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="historyBody">
+                </tbody>
+            </table>
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <div class="empty-state-icon">📭</div>
+                <div>No scans yet. Start protecting your browsing!</div>
+            </div>
+        </div>
+        <button class="btn-export" id="exportBtn">Export Report (CSV)</button>
+    </div>
+
+    <script src="dashboard.js"></script>
+</body>
+
+</html>
