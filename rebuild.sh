@@ -23,7 +23,17 @@ else
     exit 1
 fi
 
+# Install Tesseract for OCR
+if ! command -v tesseract &> /dev/null; then
+    echo "Installing Tesseract OCR..."
+    sudo apt-get update && sudo apt-get install -y tesseract-ocr
+fi
+
 echo "Installing Python dependencies..."
-pip3 install click requests || echo "Warning: pip install failed, you might need to use apt or venv."
+pip3 install click requests playwright pytesseract Pillow --break-system-packages || echo "Warning: pip install failed"
+
+# Install Playwright browsers
+echo "Installing Playwright browsers..."
+playwright install chromium
 
 echo "Build Success! Run 'chmod +x host-bridge/launcher.sh' if needed."

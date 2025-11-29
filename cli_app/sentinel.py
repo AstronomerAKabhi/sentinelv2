@@ -237,5 +237,87 @@ def scan_file(path):
     except Exception as e:
         click.echo(f"❌ Execution Failed: {str(e)}")
 
+@cli.command()
+@click.argument("url")
+def scan_vision(url):
+    """Tier 2: Visual Analysis via Computer Vision & OCR"""
+    click.echo(f"\n👁️  Visual Scanning: {url}...\n")
+    
+    # Add current directory to path to find vision_scanner
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    
+    try:
+        import vision_scanner
+    except ImportError as e:
+        click.echo(f"❌ Error: Dependencies missing ({e}). Run rebuild.sh")
+        return
+
+    screenshot_path = "/tmp/screenshot.png"
+    click.echo("📸 Capturing screenshot...")
+    saved_path = vision_scanner.capture_screenshot(url, screenshot_path)
+    
+    if not saved_path:
+        click.echo("❌ Failed to capture screenshot.")
+        return
+
+    click.echo("📝 Extracting text (OCR)...")
+    text = vision_scanner.extract_text(saved_path)
+    
+    if not text:
+        click.echo("⚠️ No text extracted or OCR failed.")
+        text = "No text found."
+    else:
+        click.echo(f"Found {len(text)} characters of text.")
+
+    # LLM Analysis
+    click.echo("🧠 Analyzing visual context...")
+    
+    api_url = "https://router.huggingface.co/v1/chat/completions"
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    
+    prompt = f"""Analyze this website context for phishing.
+URL: {url}
+Visible Text on Page:
+{text[:1000]}... (truncated)
+
+Does the visual text claim to be a major brand (like Bank, Google, Microsoft) but the URL does not match?
+Reply with MALICIOUS or SAFE and a brief reason."""
+
+    payload = {
+        "model": "google/gemma-2-2b-it",
+        "messages": [{"role": "user", "content": prompt}],
+        "max_tokens": 200
+    }
+    
+    try:
+        response = requests.post(api_url, headers=headers, json=payload)
+        if response.status_code == 200:
+            data = response.json()
+            llm_response = data['choices'][0]['message']['content']
+            
+            is_malicious = "MALICIOUS" in llm_response.upper()
+            
+            if is_malicious:
+                level = "🔴 HIGH"
+                color = "\033[91m"
+                score = 85
+            else:
+                level = "🟢 LOW"
+                color = "\033[92m"
+                score = 10
+            
+            click.echo("=" * 60)
+            click.echo(f"  Threat Level: {color}{level}\033[0m")
+            click.echo(f"  Risk Score: {score}/100")
+            click.echo("=" * 60)
+            click.echo(f"\n💬 AI Visual Analysis:")
+            click.echo(f"  {llm_response}")
+            click.echo("\n" + "=" * 60)
+            
+        else:
+            click.echo(f"❌ Error: {response.status_code} - {response.text}")
+    except Exception as e:
+        click.echo(f"❌ Exception: {str(e)}")
+
 if __name__ == "__main__":
     cli()
