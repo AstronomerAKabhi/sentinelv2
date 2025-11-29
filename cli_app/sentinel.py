@@ -280,11 +280,17 @@ URL: {url}
 Visible Text on Page:
 {text[:1000]}... (truncated)
 
-Does the visual text claim to be a major brand (like Bank, Google, Microsoft) but the URL does not match?
+Task:
+1. Identify any major brands mentioned in the text (e.g. Google, Microsoft, Bank).
+2. Check if the URL belongs to that brand.
+   - If text says "Google" and URL is "google.com" (or subdomains), it is SAFE.
+   - If text says "Google" and URL is "g0ogle.net", it is MALICIOUS.
+3. If no brand is detected, check for suspicious keywords (Login, Verify).
+
 Reply with MALICIOUS or SAFE and a brief reason."""
 
     payload = {
-        "model": "google/gemma-2-2b-it",
+        "model": "meta-llama/Meta-Llama-3-8B-Instruct",
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": 200
     }
