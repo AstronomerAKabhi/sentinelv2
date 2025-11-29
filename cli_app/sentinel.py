@@ -33,96 +33,104 @@ def cli():
 @cli.command()
 @click.argument("url")
 def scan_url(url):
-    """Tier 1: Intent Analysis via LLM (Hugging Face)"""
+    """Tier 1: Intent Analysis via Google Gemini Pro"""
     click.echo(f"\n🔍 Analyzing URL: {url}...\n")
     
-    api_url = "https://router.huggingface.co/v1/chat/completions"
-    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-    
-    payload = {
-        "model": "google/gemma-2-2b-it",
-        "messages": [{"role": "user", "content": f"Analyze this URL for phishing: {url}. Reply with MALICIOUS or SAFE."}],
-        "max_tokens": 100
-    }
-    
+    if not GEMINI_API_KEY:
+        click.echo("❌ Error: GEMINI_API_KEY not found in config.json")
+        return
+
     try:
-        response = requests.post(api_url, headers=headers, json=payload)
-        if response.status_code == 200:
-            data = response.json()
-            llm_response = data['choices'][0]['message']['content']
-            
-            is_malicious = "MALICIOUS" in llm_response.upper()
-            
-            score = 0
-            indicators = []
-            confidence = 0.7
-            
-            if is_malicious:
-                score += 70
-                indicators.append("🚨 LLM flagged as potentially malicious")
-                confidence = 0.85
-            else:
-                indicators.append("✅ LLM analysis: appears safe")
-            
-            phishing_keywords = ['login', 'verify', 'suspend', 'account', 'secure', 'update']
-            if any(keyword in url.lower() for keyword in phishing_keywords):
-                score += 20
-                indicators.append("⚠️ URL contains suspicious keywords")
-            
-            if url.startswith('http://'):
-                score += 10
-                indicators.append("⚠️ No HTTPS encryption")
-            
-            if score < 30:
-                level = "🟢 LOW"
-                color = "\033[92m"
-            elif score < 70:
-                level = "🟡 MEDIUM"
-                color = "\033[93m"
-            else:
-                level = "🔴 HIGH"
-                color = "\033[91m"
-            
-            click.echo("=" * 60)
-            click.echo(f"  Threat Level: {color}{level}\033[0m")
-            click.echo(f"  Risk Score: {score}/100")
-            click.echo(f"  Confidence: {int(confidence * 100)}%")
-            click.echo("=" * 60)
-            click.echo("\n📊 Risk Indicators:")
-            for indicator in indicators:
-                click.echo(f"  • {indicator}")
-            
-            click.echo(f"\n💬 AI Analysis:")
-            analysis_lines = llm_response.replace('\n\n', '\n').split('\n')
-            display_lines = []
-            char_count = 0
-            for line in analysis_lines[:8]:
-                if char_count + len(line) > 500:
-                    break
-                display_lines.append(f"  {line.strip()}")
-                char_count += len(line)
-            click.echo("\n".join(display_lines))
-            click.echo("\n" + "=" * 60)
-            
-            try:
-                from log_manager import save_scan_log
-                log_path = save_scan_log({
-                    "timestamp": __import__('time').time(),
-                    "target": url,
-                    "type": "url",
-                    "threat_level": level,
-                    "score": score,
-                    "confidence": confidence,
-                    "indicators": indicators,
-                    "status": "ANALYZED"
-                })
-                click.echo(f"\n💾 Saved to: {log_path}")
-            except Exception as e:
-                pass
+        import google.generativeai as genai
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel('models/gemini-pro-latest')
+        
+        prompt = f"""Analyze this URL for phishing.
+URL: {url}
+
+Task:
+1. Check if the domain is legitimate (e.g. google.com is SAFE).
+2. Check for typosquatting (e.g. g0ogle.com is MALICIOUS).
+3. Check for suspicious subdomains.
+
+Reply with this JSON format:
+{{
+  "verdict": "MALICIOUS" or "SAFE" or "SUSPICIOUS",
+  "reason": "Brief explanation",
+  "confidence": 0.0 to 1.0
+}}
+"""
+        response = model.generate_content(prompt)
+        
+        text = response.text.replace('```json', '').replace('```', '').strip()
+        data = json.loads(text)
+        
+        verdict = data.get('verdict', 'UNKNOWN').upper()
+        reason = data.get('reason', 'No reason provided')
+        confidence = data.get('confidence', 0.7)
+        
+        score = 0
+        indicators = []
+        
+        if verdict == 'MALICIOUS':
+            level = "🔴 HIGH"
+            color = "\033[91m"
+            score = 90
+            indicators.append("🚨 AI flagged as malicious")
+        elif verdict == 'SUSPICIOUS':
+            level = "🟡 MEDIUM"
+            color = "\033[93m"
+            score = 60
+            indicators.append("⚠️ AI flagged as suspicious")
         else:
-            click.echo(f"❌ Error: {response.status_code} - {response.text}")
+            level = "🟢 LOW"
+            color = "\033[92m"
+            score = 10
+            indicators.append("✅ AI analysis: appears safe")
+            
+        # Basic heuristic checks (kept as backup/supplement)
+        phishing_keywords = ['login', 'verify', 'suspend', 'account', 'secure', 'update']
+        if any(keyword in url.lower() for keyword in phishing_keywords) and verdict != 'SAFE':
+            score += 10
+            indicators.append("⚠️ URL contains suspicious keywords")
+        
+        if url.startswith('http://'):
+            score += 10
+            indicators.append("⚠️ No HTTPS encryption")
+            
+        score = min(score, 100)
+        
+        click.echo("=" * 60)
+        click.echo(f"  Threat Level: {color}{level}\033[0m")
+        click.echo(f"  Risk Score: {score}/100")
+        click.echo(f"  Confidence: {int(confidence * 100)}%")
+        click.echo("=" * 60)
+        click.echo("\n📊 Risk Indicators:")
+        for indicator in indicators:
+            click.echo(f"  • {indicator}")
+        
+        click.echo(f"\n💬 Gemini Analysis:")
+        click.echo(f"  {reason}")
+        click.echo("\n" + "=" * 60)
+        
+        try:
+            from log_manager import save_scan_log
+            log_path = save_scan_log({
+                "timestamp": __import__('time').time(),
+                "target": url,
+                "type": "url",
+                "threat_level": level,
+                "score": score,
+                "confidence": confidence,
+                "indicators": indicators,
+                "status": "ANALYZED"
+            })
+            click.echo(f"\n💾 Saved to: {log_path}")
+        except Exception as e:
+            pass
+            
     except Exception as e:
-        click.echo(f"❌ Exception: {str(e)}")
+        click.echo(f"❌ Gemini Error: {str(e)}")
 
 @cli.command()
 @click.argument("path")
